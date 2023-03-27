@@ -1,0 +1,393 @@
+<?php
+
+//sleep(10);
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+use PingYo\Status;
+
+class pingyousa
+{
+    var $response = array();
+    //function __construct($client_detail, $post){
+    //parent::__construct();
+
+    function __construct($client_detail, $post)
+    {
+        $this->manageDependencies();
+        unset($root, $library, $path);
+//        $post = (object)$post;
+
+        try {
+            $today = new DateTime("now", new DateTimeZone("UTC"));
+        } catch (Exception $e) {
+        }
+
+
+
+        $dob_day = $post->applicant->dateOfBirthDay;
+        $dob_month = $post->applicant->dateOfBirthMonth;
+        $dob_year = $post->applicant->dateOfBirthYear;
+        $dob = new DateTime($dob_year . '/' . $dob_month . '/' . $dob_day, new DateTimeZone("UTC"));
+        $dateOfBirth = '/Date(' . ($dob->getTimestamp() * 1000) . ')/';
+
+        $next_pay_date_day = $post->employer->nextPayDateDay;
+        $next_pay_date_month = $post->employer->nextPayDateMonth;
+        $next_pay_date_year = $post->employer->nextPayDateYear;
+        $npd = new DateTime($next_pay_date_year . '/' . $next_pay_date_month . '/' . $next_pay_date_day, new DateTimeZone("UTC"));
+        $nextPayDate = '/Date(' . ($npd->getTimestamp() * 1000) . ')/';
+//        $nextPayDate = $next_pay_date_year . '/' . $next_pay_date_month . '/' . $next_pay_date_day;
+
+
+        $followingPayDateDay = $post->employer->followingPayDateDay;
+        $followingPayDateMonth = $post->employer->followingPayDateMonth;
+        $followingPayDateYear = $post->employer->followingPayDateYear;
+        $fpd = new DateTime($followingPayDateYear . '/' . $followingPayDateMonth . '/' . $followingPayDateDay, new DateTimeZone("UTC"));
+        $followingPayDate = '/Date(' . ($fpd->getTimestamp() * 1000) . ')/';
+//        $followingPayDate = $followingPayDateYear . '/' . $followingPayDateMonth . '/' . $followingPayDateDay;
+
+        $numberOfMonthsAtAddress = floor($post->applicant->monthsAtAddress);
+        $date = date("c", strtotime('-' . $numberOfMonthsAtAddress . " months", strtotime($post->created_at)));
+        $AddressMoveIn = date("c", strtotime($date));
+        $ami = new DateTime($AddressMoveIn, new DateTimeZone("UTC"));
+        $AddressMoveIn = '/Date(' . ($ami->getTimestamp() * 1000) . ')/';
+
+        // Time in current employment status
+        $numberOfMonthsInCurrentEmploymentStatus = floor($post->employer->monthsAtEmployer);
+        $date = date("c", strtotime('-' . $numberOfMonthsInCurrentEmploymentStatus . " months", strtotime($post->created_at)));
+        $EmploymentStarted = date("c", strtotime($date));
+        $es = new DateTime($EmploymentStarted, new DateTimeZone("UTC"));
+        $EmploymentStarted = '/Date(' . ($es->getTimestamp() * 1000) . ')/';
+
+        // Time at bank
+        $numberOfMonthsInBank = floor($post->bank->bankAccountLength);
+        $date = date("c", strtotime('-' . $numberOfMonthsInBank . " months", strtotime($post->created_at)));
+        $BankAccountOpened = date("c", strtotime($date));
+        $bao = new DateTime($BankAccountOpened, new DateTimeZone("UTC"));
+        $BankAccountOpened = '/Date(' . ($bao->getTimestamp() * 1000) . ')/';
+
+
+        switch ($post->employer->incomeSource) {
+            case 'SelfEmployed':
+                $post->employer->incomeSource = '1';
+            case 'EmployedFullTime':
+                $post->employer->incomeSource = '2';
+            case 'EmployedPartTime':
+                $post->employer->incomeSource = '3';
+            case 'EmployedTemporary':
+                $post->employer->incomeSource = '4';
+            case 'Pension':
+                $post->employer->incomeSource = '5';
+            case 'DisabilityBenefits':
+                $post->employer->incomeSource = '6';
+            case 'Benefits':
+                $post->employer->incomeSource = '7';
+        }
+        switch ($post->employer->incomeCycle) {
+            case 'Weekly':
+                $post->employer->incomeCycle = '1';
+            case 'BiWeekly':
+                $post->employer->incomeCycle = '2';
+            case 'TwiceMonthly':
+                $post->employer->incomeCycle = '7';
+            case 'FourWeekly':
+                $post->employer->incomeCycle = '8';
+            case 'Monthly':
+                $post->employer->incomeCycle = '14';
+            case 'LastWorkingDayMonth':
+                $post->employer->incomeCycle = '14';
+        }
+        switch ($post->employer->incomePaymentType) {
+            case 'Cash':
+                $post->employer->incomePaymentType = '2';
+            case 'Cheque':
+                $post->employer->incomePaymentType = '3';
+            case 'RegionalDirectDeposit':
+                $post->employer->incomePaymentType = '4';
+        }
+        switch ($post->applicant->inMilitary) {
+            case 'None':
+                $post->applicant->inMilitary = '1';
+            case 'Veteran':
+                $post->applicant->inMilitary = '2';
+            case 'Reserves':
+                $post->applicant->inMilitary = '3';
+            case 'ActiveDuty':
+                $post->applicant->inMilitary = '4';
+        }
+        switch ($post->residence->residentialStatus) {
+            case 'HomeOwner':
+                $post->residence->residentialStatus = '1';
+            case 'PrivateTenant':
+                $post->residence->residentialStatus = '2';
+            case 'CouncilTenant':
+                $post->residence->residentialStatus = '3';
+            case 'LivingWithParents':
+                $post->residence->residentialStatus = '4';
+            case 'LivingWithFriends':
+                $post->residence->residentialStatus = '5';
+            case 'Other':
+                $post->residence->residentialStatus = '6';
+
+        }
+        switch ($post->bank->bankAccountType) {
+            case 'Checking':
+                $post->bank->bankAccountType = '1';
+            case 'Savings':
+                $post->bank->bankAccountType = '2';
+
+        }
+        switch ($post->applicant->maritalStatus) {
+            case 'Single':
+                $post->applicant->maritalStatus = '1';
+            case 'Married':
+                $post->applicant->maritalStatus = '2';
+            case 'LivingTogether':
+                $post->applicant->maritalStatus = '3';
+            case 'Separated':
+                $post->applicant->maritalStatus = '4';
+            case 'Divorced':
+                $post->applicant->maritalStatus = '5';
+            case 'Widowed':
+                $post->applicant->maritalStatus = '6';
+            case 'Other':
+                $post->applicant->maritalStatus = '7';
+        }
+        if ($post->consent->consentFinancial === '1' || 1) {
+            $post->consent->consentFinancial = true;
+        } else {
+            $post->consent->consentFinancial = false;
+        }
+        if ($post->consent->consentCreditSearch === '1' || 1) {
+            $post->consent->consentCreditSearch = true;
+        } else {
+            $post->consent->consentCreditSearch = false;
+        }
+        if ($post->consent->consentThirdPartyEmails === '1' || 1) {
+            $post->consent->consentThirdPartyEmails = true;
+        } else {
+            $post->consent->consentThirdPartyEmails = false;
+        }
+        if ($post->consent->consentThirdPartySMS === '1' || 1) {
+            $post->consent->consentThirdPartySMS = true;
+        } else {
+            $post->consent->consentThirdPartySMS = false;
+        }
+        if ($post->consent->consentThirdPartyPhone === '1' || 1) {
+            $post->consent->consentThirdPartySMS = true;
+        } else {
+            $post->consent->consentThirdPartyPhone = false;
+        }
+
+
+        $application = (object)[];
+        $application->AffiliateId = $client_detail->parameter1;
+        $application->Campaign = 'UPING';
+        $application->SubAffiliate = '';
+        $application->Timeout = $client_detail->timeout;
+        $application->TestOnly = true; // $client_detail->mode;
+
+//        dd($post->source->ipAddress);
+//        $test_ip =
+        $application->SourceDetails = (object)[];
+        $application->SourceDetails->Address = $post->source->ipAddress;
+        $application->SourceDetails->ClientUserAgent = $post->source->userAgent;
+        $application->SourceDetails->CreationUrl = $post->source->creationUrl;
+        $application->SourceDetails->ReferringUrl = $post->source->referringUrl;
+
+        $application->Application = (object)[];
+        $application->Application->Title = $post->applicant->nameTitle ?? PingYo\TitleType::MR;
+        $application->Application->FirstName = $post->applicant->firstName;
+        $application->Application->LastName = $post->applicant->lastName;
+        $application->Application->DateOfBirth = $dateOfBirth;
+        $application->Application->Email = $post->applicant->email;
+        $application->Application->HomePhoneNumber = $post->applicant->homePhoneNumber;
+        $application->Application->MobilePhoneNumber = $post->applicant->cellPhoneNumber;
+        $application->Application->WorkPhoneNumber = $post->applicant->workPhoneNumber ?? 'default phone';
+
+        $application->Application->EmployerName = $post->employer->employerName ?? 'NOT AVAILABLE';
+//        $application->Application->employerindustry = $post->employer->employerIndustry ?? 'Other';
+        $application->Application->JobTitle = $post->employer->jobTitle;
+        $application->Application->EmploymentStarted = $EmploymentStarted;
+        $application->Application->IncomeSource = $post->employer->incomeSource;
+        $application->Application->PayFrequency = $post->employer->incomeCycle;
+        $application->Application->PayAmount = $post->employer->monthlyIncome;
+//        dd($post->employer->incomePaymentType);
+        $application->Application->IncomePaymentType = $post->employer->incomePaymentType;
+
+        $application->Application->NextPayDate = $nextPayDate;
+        $application->Application->FollowingPayDate = $followingPayDate;
+
+        $application->Application->LoanAmount = $post->loan->loanAmount;
+        $application->Application->Term = $post->loan->loanTerms;
+
+        $application->Application->ResidentialStatus = $post->residence->residentialStatus;
+        $application->Application->HouseNumber = $post->residence->houseNumber;
+        $application->Application->HouseName = $post->residence->houseName;
+        $application->Application->AddressStreet1 = $post->residence->addressStreet1;
+        $application->Application->AddressCity = $post->residence->city;
+        $application->Application->AddressState = $post->residence->state;
+        $application->Application->AddressMoveIn = $AddressMoveIn ?? '10-11-2018';
+        $application->Application->AddressPostcode = $post->residence->zip;
+
+        $application->Application->BankName = $post->bank->bankName;
+        $application->Application->BankAccountNumber = $post->bank->bankAccountNumber;
+        $application->Application->BankRoutingNumber = $post->bank->bankRoutingNumber;
+        $application->Application->BankAccountType = $post->bank->bankAccountType;
+        $application->Application->BankAccountOpened = $BankAccountOpened;
+
+        $application->Application->MaritalStatus = $post->applicant->maritalStatus;
+        $application->Application->NumberOfDependents = $post->applicant->dependants;
+        $application->Application->CombinedMonthlyHouseholdIncome = $post->employer->combinedMonthlyHouseholdIncome;
+
+        $application->Application->DriversLicenseNumber = $post->applicant->drivingLicenseNumber;
+        $application->Application->DriversLicenseState = $post->applicant->drivingLicenseState;
+        $application->Application->NationalIdentityNumber = $post->applicant->ssn;
+        $application->Application->MilitaryService = $post->applicant->inMilitary;
+
+        $application->Application->ConsentToCreditSearch = $post->consent->consentFinancial;
+        $application->Application->ConsentToMarketingEmails = $post->consent->consentThirdPartyEmails;
+
+        $application->MinimumCommissionAmount = 0;
+        $application->MaximumCommissionAmount = 0;
+        $application->ApplicationExtensions = array(
+            'Name' => "x", "Value" =>"foo",
+        );
+//        dd($application);
+
+//        $application->setApplicationDetails($application->Application);
+//        $application->setSourceDetails($application->SourceDetails);
+//        dd($application);
+
+        $offer_id = null;
+        $aff_id = null;
+        $aff_name = null;
+        $testmode = true;
+
+
+//        dd(json_encode($application));
+//        $validation_result = $application->validate();
+        $validation_result = true;
+//        dd($validation_result);
+        if ($validation_result == true) {
+            $application_status = (new \PingYo\Application())->send($application);
+            dd($application_status);
+            $this->response['application_response'] = (array)$application_status;
+
+            $this->response['validated'] = true;
+
+            $this->response['post_url'] = ($client_detail->status == '0') ? $client_detail->post_url_test : $client_detail->post_url_live;
+        } else {
+            $this->response['application_response'] = $validation_result;
+            $this->response['validated'] = false;
+        }
+    }
+
+    private function manageDependencies()
+    {
+        require_once dirname(__DIR__) . '/vendor/PingYo/Application.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/SourceDetails.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/ApplicationDetails.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/Status.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/TitleType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/BankCardType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/ResidentialStatusType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/IncomePaymentType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/PayFrequencyType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/IncomeSourceType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/EmployerIndustryType.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/NationalIdentityNumberType.php';
+        require_once dirname(__DIR__) . '/vendor/autoload.php';
+        require_once dirname(__DIR__) . '/vendor/PingYo/ExtendedValidator.php';
+
+    }
+
+    function get_client_ip()
+    {
+        $ipaddress = '';
+        if (getenv('HTTP_CLIENT_IP'))
+            $ipaddress = getenv('HTTP_CLIENT_IP');
+        else if (getenv('HTTP_X_FORWARDED_FOR'))
+            $ipaddress = getenv('HTTP_X_FORWARDED_FOR');
+        else if (getenv('HTTP_X_FORWARDED'))
+            $ipaddress = getenv('HTTP_X_FORWARDED');
+        else if (getenv('HTTP_FORWARDED_FOR'))
+            $ipaddress = getenv('HTTP_FORWARDED_FOR');
+        else if (getenv('HTTP_FORWARDED'))
+            $ipaddress = getenv('HTTP_FORWARDED');
+        else if (getenv('REMOTE_ADDR'))
+            $ipaddress = getenv('REMOTE_ADDR');
+        else
+            $ipaddress = 'UNKNOWN';
+        return $ipaddress;
+    }
+
+    public function returnresponse()
+    {
+        $appResponse = $this->response['application_response'];
+        if ($this->response['validated'] === true) {
+            $status = new PingYo\Status('202', null, $appResponse['correlationid'], null);
+            $counter = 0;
+            while (true) {
+                $res = $status->refresh();
+                $counter++;
+                if ($status->percentagecomplete == 100) {
+                    break;
+                }
+
+                sleep(3);
+            }
+
+            $this->response['post_res'] = json_encode($status);
+
+            $this->response['correlationid'] = $status->correlationid;
+//        preg_match("/<Payout>(.*)<\/Payout>/", $this->response['post_res'], $price);
+//        preg_match("/<Result>(.*)<\/Result>/", $this->response['post_res'], $status);
+//        preg_match("/<RedirectURL>(.*)<\/RedirectURL>/", $this->response['post_res'], $RedirectURL);
+
+            //print_r($price); print_r($status);exit;
+
+            if ($status->status == 'LenderMatchFound') {
+                $this->response['accept'] = 'ACCEPTED';
+                $this->response['post_price'] = $status->estimatedcommission->Amount;
+                $this->response['post_status'] = '1';
+                $this->response['redirect_url'] = $status->redirectionurl;
+
+            } else {
+                $this->response['accept'] = 'REJECTED';
+                $this->response['post_status'] = '0';
+                $this->response['post_price'] = '0';
+            }
+            //print_r($this->response);exit;
+            return $this->response;
+        } else {
+            $this->response['accept'] = 'Validation Failed';
+            $this->response['post_status'] = '0';
+            $this->response['post_price'] = '0';
+            return $this->response;
+        }
+
+    }
+
+    public function returnresponse_ping($result)
+    {
+        //print_r($result);exit;
+        $this->response['ping_res'] = html_entity_decode($result['ping_res']);
+
+        $this->response['ping_time'] = $result['ping_time'];
+        //echo $this->response['ping_time'];exit;
+        preg_match("/<Payout>(.*)<\/Payout>/", $this->response['ping_res'], $price);
+        preg_match("/<Result>(.*)<\/Result>/", $this->response['ping_res'], $status);
+        preg_match("/<LeadID>(.*)<\/LeadID>/", $this->response['ping_res'], $pingid);
+
+        if ($status[1] == 'Accepted') {
+            $this->response['accept'] = 'ACCEPTED';
+            $this->response['ping_price'] = $price[1];
+            $this->response['ping_status'] = '1';
+        } else {
+            $this->response['accept'] = 'REJECTED';
+            $this->response['ping_status'] = '0';
+            $this->response['ping_price'] = '0';
+        }
+        return $this->response;
+    }
+}
